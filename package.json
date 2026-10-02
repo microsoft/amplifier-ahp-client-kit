@@ -1,0 +1,30 @@
+{
+  "name": "@amplifier/client-kit",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AHP resource recovery and durable intent primitives for independent clients",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./indexeddb": "./src/indexeddb.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "@microsoft/agent-host-protocol": "^0.9.0"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.0"
+  },
+  "types": "./src/index.d.ts"
+}
