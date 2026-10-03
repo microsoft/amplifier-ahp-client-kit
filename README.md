@@ -5,7 +5,7 @@ Protocol and persistence primitives for independent JavaScript clients. No React
 - `ConfirmedResources`: official AHP reducers, per-resource confirmed baselines, duplicate sequence suppression, explicit missing-baseline result and eviction.
 - `openConnection`: transport-agnostic official AHP JSON-RPC client; event reader registered before handshake.
 - `recoverConnection`: upstream initialize/reconnect snapshot/replay flow, missing baseline fresh initialization, explicit pending-action discard signal. Catalog refresh and reconnect retry timing remain the caller's application policy.
-- `IntentJournal`: durable intent recorded before dispatch, separately settled after echo/rejection or receipt; it never retries unknown work. The storage contract is asynchronous `read(key)` and durable `write(key,value)`.
+- `IntentJournal`: captures the original target/action before asynchronous storage, records intent durably before dispatch, and serializes admission and settlement per identity on the same storage adapter. Settlement preserves original identity/payload and earlier receipt details; it never retries unknown work. The storage contract is asynchronous `read(key)` and durable `write(key,value)`.
 - `@amplifier/ahp-client-kit/indexeddb`: scoped browser store, isolated by host/account/tab, for private drafts, blobs, journal records and optional disposable caches. Consumers supply their authenticated nonsecret account identity.
 
 ```js
@@ -68,3 +68,7 @@ public installed-host tests for real CLI invocation, bearer authentication,
 multiple inputs, approval handoff, lost acknowledgement and no replay. Those
 fixtures use a provider-free ACP peer; they do not establish real-model acceptance.
 Filesystem durability is currently qualified on POSIX systems.
+
+## Journal integration boundary
+
+Send the captured `begin(...).intent.action` to the captured `intent.channel` only after a newly created admission completes. Editing a newer private draft must not change the admitted input. Reusing an identity returns the original record without dispatch; callers remain responsible for detecting conflicting reuse. Route echo and receipt updates through `settle` on the same adapter object to preserve concurrent evidence. Distinct adapter instances, tabs and processes require storage-owned transactions or exclusive claims; this in-process queue does not provide cross-process admission. A failed write rejects without dispatch or automatic retry. No subscription, cache policy or UI state is added by the journal.
