@@ -49,15 +49,31 @@ skipped (`--skipLibCheck`); the kit declarations and consumer are checked.
 Installed archive in the unmodified web consumer: 39 passed, 0 skipped across
 client, capability, canvas, queue, performance and conversation-window suites.
 
+Follow-up installed qualification used the same sealed archive on Node 25.2.1:
+all seven headless tests passed, zero skips, including installed native
+Core/Foundation new/resumed input, exact lost-reply recovery and real CLI invocation.
+Node 22.22.0 subsequently passed all eleven kit plus seven headless checks (18 total,
+zero skips). Peers were the sealed c4968233 distribution host and native f530e541
+wheel, with offline providers and task-owned state. Shared executables were read-only.
+
+Qualified implementation `40d6e8509ae872a3c2437940cb7ed1237dc919e5` and merged
+`cb2fb5a6dc4844e1763de0282cec9836dacafd55` have identical complete Git tree
+`8beb2e62d5417e82c0f8a3fb30b59071f0dd908c`. Sealed package version 0.1.0 archive
+SHA256 is `c5782631b2214987b9437f5979dc2603c51f6bb5fad44172d66d92f8381ccfc6`.
+The coordinator retains the qualification/merge receipts and logs. This documentation
+successor does not rebuild or replace that archive; runtime source, tests, declarations
+and package/dependency manifests remain identical to the qualified merged source.
+
 This does not establish browser/device/account acceptance, Rust renderer execution,
-Node 22 verification, production adoption or native Core/Foundation execution for
-this candidate. Historical baseline headless evidence is not counted as a fresh pass.
+Node 22.16 exact-patch verification or production adoption. Native qualification is
+installed offline fixture execution, not a real model account. Historical baseline
+evidence is not counted as a fresh pass.
 
 ## Optional consumer follow-up
 
-Web dispatch currently sends the caller's action object after journal admission.
+At the audited web af015ed revision, dispatch sends the caller's action object after journal admission.
 Consumers should dispatch the captured `started.intent.action` to its captured
-channel; the helper cannot stop a caller sending a later-mutated object. Web echo
+channel; the helper cannot stop a caller sending a later-mutated object. At that revision, web echo
 settlement also writes directly to storage; routing that update through `settle`
 would participate in this queue. These observations were sent to the distribution
 coordinator for web-owner coordination; no consumer source was changed here.
