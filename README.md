@@ -1,5 +1,7 @@
 # Amplifier client kit
 
+Start with the [local vision](docs/VISION.md), [contract v1](contracts/client-kit.v1.md) and [contributor entry point](AGENTS.md). They apply the approved family direction; qualification is recorded separately.
+
 Protocol and persistence primitives for independent JavaScript clients. No React, web product selectors, native runtime imports, or sibling checkout dependencies.
 
 - `ConfirmedResources`: official AHP reducers, per-resource confirmed baselines, duplicate sequence suppression, explicit missing-baseline result and eviction.
