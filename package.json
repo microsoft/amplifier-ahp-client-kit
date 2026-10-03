@@ -17,7 +17,8 @@
     "./file-storage": {
       "types": "./src/file-storage.d.ts",
       "import": "./src/file-storage.js"
-    }
+    },
+    "./cli": "./src/cli.js"
   },
   "files": [
     "src",

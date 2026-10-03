@@ -29,7 +29,7 @@ The installed `amplifier-ahp` executable uses Node 22.16+ and the same public AH
 surface as interactive clients. It submits through the host's configured agent,
 including its real provider/model defaults. It never loads a native runtime in the
 client. Headless helpers are available from the optional `./headless` and
-`./file-storage` entrypoints; importing the browser entrypoint does not load Node
+`./file-storage` entrypoints; `./cli` is the executable entrypoint for distribution launchers. importing the browser entrypoint does not load Node
 storage or WebSocket implementations.
 
 ```sh
