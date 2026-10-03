@@ -22,3 +22,49 @@ AHP is normative: https://microsoft.github.io/agent-host-protocol/ . This packag
 `npm ci && npm test` runs independently without model accounts. `npm pack` produces the publishable package. Qualification currently installs the resulting archive in the web consumer; no registry publication is implied.
 
 The intended repository is `microsoft/amplifier-ahp-client-kit`. Repository metadata names the intended publication destination; no remote or registry publication is implied.
+
+## Noninteractive client
+
+The installed `amplifier-ahp` executable uses Node 22.16+ and the same public AHP
+surface as interactive clients. It submits through the host's configured agent,
+including its real provider/model defaults. It never loads a native runtime in the
+client. Headless helpers are available from the optional `./headless` and
+`./file-storage` entrypoints; importing the browser entrypoint does not load Node
+storage or WebSocket implementations.
+
+```sh
+amplifier-ahp run --server wss://your-host/ahp --token-file host-token.txt \
+  --workspace /host/work/project --prompt-file request.txt --command first-input
+amplifier-ahp run --server wss://your-host/ahp --token-file host-token.txt \
+  --session ahp-session:/SESSION_ID --prompt-file follow-up.txt --command next-input \
+  --output json
+amplifier-ahp inspect --server wss://your-host/ahp --token-file host-token.txt \
+  --command first-input --output json
+```
+
+`--agent` selects a host-advertised agent for a new session. A resumed session
+keeps its original agent and workspace. Bundle/provider/model overrides are not
+invented by this CLI; they remain configured by that agent's advertised settings.
+The host URI, session ID, command ID and original prompt are saved privately before
+session creation or prompt delivery. State is scoped by host and credential
+identity; supply a stable `--identity` when rotating a token. Keep these local
+records to inspect an interrupted command. Reusing an ID only observes its original
+input; changing its payload is rejected. A crashed command lock is never stolen.
+Lost create acknowledgements are also never retried. Hosts without receipt
+extensions still support standard current-page recovery; older absent output stays
+unconfirmed instead of triggering an unbounded history scan or another prompt.
+
+Text and JSON emit the final result. `--output jsonl --trace` explicitly includes
+selected-session actions, which can contain private prompt/tool content. Trace
+output and recovery queues are bounded; a slow consumer disconnects without
+cancelling or replaying host work. `--wait-ms` bounds observation (a handshake or
+in-flight request may finish later). Exit codes are 0 completed, 1 rejected or
+failed, 2 invalid invocation, 3 running or unconfirmed, and 4 interactive input
+needed. The CLI never grants approvals automatically and never cancels merely
+because a wait, connection, or process ends.
+
+`AHP_HEADLESS_HOST_MODULE=/absolute/installed-host/dist/index.js npm test` adds
+public installed-host tests for real CLI invocation, bearer authentication,
+multiple inputs, approval handoff, lost acknowledgement and no replay. Those
+fixtures use a provider-free ACP peer; they do not establish real-model acceptance.
+Filesystem durability is currently qualified on POSIX systems.

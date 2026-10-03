@@ -9,7 +9,15 @@
       "types": "./src/index.d.ts",
       "import": "./src/index.js"
     },
-    "./indexeddb": "./src/indexeddb.js"
+    "./indexeddb": "./src/indexeddb.js",
+    "./headless": {
+      "types": "./src/headless.d.ts",
+      "import": "./src/headless.js"
+    },
+    "./file-storage": {
+      "types": "./src/file-storage.d.ts",
+      "import": "./src/file-storage.js"
+    }
   },
   "files": [
     "src",
@@ -21,7 +29,8 @@
     "pack:check": "npm pack --dry-run"
   },
   "dependencies": {
-    "@microsoft/agent-host-protocol": "^0.9.0"
+    "@microsoft/agent-host-protocol": "^0.9.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.0"
@@ -30,5 +39,11 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/microsoft/amplifier-ahp-client-kit.git"
+  },
+  "bin": {
+    "amplifier-ahp": "./src/cli.js"
+  },
+  "engines": {
+    "node": ">=22.16"
   }
 }
