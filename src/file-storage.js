@@ -12,7 +12,8 @@ export class FileStorage {
     catch(error) { if(error.code==='ENOENT')return undefined; throw error; }
   }
   async write(key, value) {
-    await this.ready(); const text=JSON.stringify(value); if(Buffer.byteLength(text)>8*1024*1024)throw Error('Saved command exceeds the storage limit');
+    const text=JSON.stringify(value); if(Buffer.byteLength(text)>8*1024*1024)throw Error('Saved command exceeds the storage limit');
+    await this.ready();
     const path=this.path(key), temporary=path+'.'+randomUUID()+'.tmp';
     const file=await open(temporary,'wx',0o600);
     try { await file.writeFile(text); await file.sync(); } finally { await file.close(); }

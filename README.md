@@ -10,6 +10,12 @@ Protocol and persistence primitives for independent JavaScript clients. No React
 - `IntentJournal`: captures the original target/action before asynchronous storage, records intent durably before dispatch, and serializes admission and settlement per identity on the same storage adapter. Settlement preserves original identity/payload and earlier receipt details; it never retries unknown work. The storage contract is asynchronous `read(key)` and durable `write(key,value)`.
 - `@amplifier/ahp-client-kit/indexeddb`: scoped browser store, isolated by host/account/tab, for private drafts, blobs, journal records and optional disposable caches. Consumers supply their authenticated nonsecret account identity.
 
+Browser and file writes capture their supported value before waiting for storage
+readiness or queued durability. Later edits to a private draft object cannot
+change an earlier submitted write. Unsupported values reject without a saved
+record; a later explicit valid write remains possible. File storage supports
+JSON values; browser storage supports structured-clone values, including blobs.
+
 ```js
 import {ConfirmedResources, openConnection, recoverConnection, IntentJournal} from '@amplifier/ahp-client-kit';
 const store = new ConfirmedResources();
