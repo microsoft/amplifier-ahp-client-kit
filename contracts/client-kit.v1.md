@@ -45,6 +45,10 @@ owner before this packet is revised to promise it.
   objects, tabs/processes need storage-owned atomicity/exclusive claims. The journal
   queue is not cross-process exclusion. Preserve private drafts independently of
   disposable protocol state and provide authenticated nonsecret account identity.
+- The supplied browser and file adapters capture supported write values before
+  asynchronous readiness or queueing; later private object edits cannot alter an
+  earlier write. [Storage capture tests](../test/storage-capture.test.mjs) cover
+  queued browser drafts, file readiness, and rejection without a partial record.
 - Bound interest, selected windows, queues and local storage under client policy.
   Eviction must unsubscribe/resubscribe to obtain fresh baselines, never silently
   truncate required authoritative state. The kit does not impose a global cache.
