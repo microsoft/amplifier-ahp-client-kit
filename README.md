@@ -50,9 +50,34 @@ amplifier-ahp inspect --server wss://your-host/ahp --token-file host-token.txt \
   --command first-input --output json
 ```
 
-`--agent` selects a host-advertised agent for a new session. A resumed session
-keeps its original agent and workspace. Bundle/provider/model overrides are not
-invented by this CLI; they remain configured by that agent's advertised settings.
+`--agent` selects a host-advertised ACP agent for a new session. A resumed
+session keeps its original agent, workspace and configuration. Hosts advertising
+`managedCreation` v1 also support new managed chats with configured bundle aliases
+and typed provider-instance/model selections:
+
+```sh
+amplifier-ahp run --server wss://your-host/ahp --token-file host-token.txt \
+  --managed --agent amplifier --bundle work --provider work-openai \
+  --model YOUR_MODEL --effort low --prompt-file request.txt --command managed-input
+```
+
+`--managed` cannot be combined with `--session` or `--workspace`. The optional
+`--bundle` is an exact advertised alias, not a file or source URL; its revision
+is read and bound before creation. `--provider` names the configured provider
+**instance**, separate from the ACP `--agent`, and requires `--model` (and vice
+versa). `--effort` requires that pair. These options never reconfigure a resumed
+session. Omitted selections retain native defaults; unavailable negotiation,
+bundle or provider instance refuses before creation without a fallback. A model
+name is passed exactly; a successful creation does not establish model/account
+availability until the explicitly requested input executes.
+
+Managed creation has a separately saved original creation command, target session
+and frozen request. A lost creation acknowledgement is recovered with the host's
+exact passive receipt. Even after creation is confirmed, that recovery never sends
+an input. If the original local attempt conclusively stopped before delivery,
+the result says `not-sent`; explicitly use the returned `--session` with a new
+input command. A still-running or interrupted local admission stays unconfirmed. Unknown receipts stay unknown; current settings are never used as
+proof of an earlier command.
 The host URI, session ID, command ID and original prompt are saved privately before
 session creation or prompt delivery. State is scoped by host and credential
 identity; supply a stable `--identity` when rotating a token. Keep these local
@@ -80,3 +105,11 @@ Filesystem durability is currently qualified on POSIX systems.
 ## Journal integration boundary
 
 Send the captured `begin(...).intent.action` to the captured `intent.channel` only after a newly created admission completes. Editing a newer private draft must not change the admitted input. Reusing an identity returns the original record without dispatch; callers remain responsible for detecting conflicting reuse. Route echo and receipt updates through `settle` on the same adapter object to preserve concurrent evidence. Distinct adapter instances, tabs and processes require storage-owned transactions or exclusive claims; this in-process queue does not provide cross-process admission. A failed write rejects without dispatch or automatic retry. No subscription, cache policy or UI state is added by the journal.
+
+Managed flags qualification uses `AHP_HEADLESS_HOST_MODULE` and
+`AHP_HEADLESS_NATIVE_PYTHON` with `test/managed-native.test.mjs`. The fixture owns
+all home/settings/state paths, supplies an offline public Core provider, guards
+real shared settings/keys against changes, and verifies bundle/instance/model/effort
+on an explicit input and cold continuation. It does not establish real account,
+remote model, current deployment or physical terminal acceptance. Failures retain
+the owned fixture; `AHP_HEADLESS_KEEP_FIXTURE=1` also retains success evidence.

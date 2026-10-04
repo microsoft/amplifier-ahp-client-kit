@@ -1,0 +1,32 @@
+name: Client kit
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  source-and-package:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - name: Independent packed consumer
+        shell: bash
+        run: |
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
+          mkdir "$RUNNER_TEMP/client-kit-consumer"
+          cd "$RUNNER_TEMP/client-kit-consumer"
+          npm init -y
+          npm install --ignore-scripts "$RUNNER_TEMP/amplifier-ahp-client-kit-0.1.0.tgz" fake-indexeddb@6.2.5
+          cp -R "$GITHUB_WORKSPACE/test" node_modules/@amplifier/ahp-client-kit/test
+          node --test node_modules/@amplifier/ahp-client-kit/test/*.test.mjs
+          ./node_modules/.bin/amplifier-ahp --help

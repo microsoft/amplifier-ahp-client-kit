@@ -13,6 +13,11 @@ const help=`Usage: amplifier-ahp run --server ws://host:port --prompt-file promp
   --session URI       Submit new input to this existing AHP session
   --agent ID          Advertised agent for a new session (default: host default)
   --workspace PATH    Host-side workspace for a new session
+  --managed           Create a new host-managed chat (no workspace or --session)
+  --bundle ALIAS      Configured bundle alias for --managed
+  --provider INSTANCE Configured provider instance (requires --model)
+  --model ID          Exact model for that instance (requires --provider)
+  --effort VALUE      Optional effort for the explicit provider/model pair
   --command ID        Durable input identity (generated for run)
   --token-file PATH   Host bearer token; never a URL query parameter
   --ca-file PATH      Additional trusted CA for the host TLS connection
@@ -25,7 +30,7 @@ const help=`Usage: amplifier-ahp run --server ws://host:port --prompt-file promp
 
 Repeated command IDs inspect the original input; they never resend it.
 An interrupted wait leaves host work running. Approval requires an interactive client.
-Agent/model/bundle defaults come from the configured host; this client does not change them.
+Managed overrides use advertised host choices; existing sessions keep their configuration.
 Exit codes: 0 completed, 1 failed/rejected, 2 usage, 3 unconfirmed/running, 4 input needed.
 `;
 
@@ -35,11 +40,11 @@ async function promptFile(path){
 }
 
 async function main(){
-  const {values:v,positionals}=parseArgs({allowPositionals:true,options:Object.fromEntries(['server','prompt-file','session','agent','workspace','command','token-file','ca-file','state-dir','identity','wait-ms','output'].map(key=>[key,{type:'string'}]).concat([['help',{type:'boolean',short:'h'}],['trace',{type:'boolean'}]]))});
+  const {values:v,positionals}=parseArgs({allowPositionals:true,options:Object.fromEntries(['server','prompt-file','session','agent','workspace','bundle','provider','model','effort','command','token-file','ca-file','state-dir','identity','wait-ms','output'].map(key=>[key,{type:'string'}]).concat([['help',{type:'boolean',short:'h'}],['trace',{type:'boolean'}],['managed',{type:'boolean'}]]))});
   if(v.help){process.stdout.write(help);return;}
   const mode=positionals[0];if(positionals.length!==1||!['run','inspect'].includes(mode)||!v.server)throw Error('Choose run or inspect and provide --server. Use --help for options.');
   if(mode==='run'&&!v['prompt-file'])throw Error('run requires --prompt-file');
-  if(mode==='inspect'&&(!v.command||v['prompt-file']||v.session||v.agent||v.workspace))throw Error('inspect requires --command and accepts no new session or input options');
+  if(mode==='inspect'&&(!v.command||v['prompt-file']||v.session||v.agent||v.workspace||v.managed||v.bundle||v.provider||v.model||v.effort))throw Error('inspect requires --command and accepts no new session or input options');
   const format=v.output??'text';if(!['text','json','jsonl'].includes(format)||v.trace&&format!=='jsonl')throw Error('Use text, json, or jsonl output; --trace requires jsonl');
   const url=new URL(v.server);if(!['ws:','wss:'].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw Error('Use a ws:// or wss:// server URL without credentials, query, or fragment');
   const token=v['token-file']?(await readFile(v['token-file'],'utf8')).trim():undefined;
@@ -51,7 +56,7 @@ async function main(){
   const options={url:url.href,token,ca:v['ca-file']?await readFile(v['ca-file']):undefined,storage,commandId,timeoutMs:Number(v['wait-ms']??(mode==='run'?300000:30000)),
     onStarted:record=>{if(format==='jsonl')emit({type:'started',...record});else process.stderr.write(`Command ${record.commandId}\nSession ${record.session}\n`);},
     ...(v.trace?{onEvent:envelope=>{if(envelope.channel!== 'ahp-root://')emit({type:'action',envelope});}}:{})};
-  const result=mode==='run'?await runPrompt({...options,prompt:await promptFile(v['prompt-file']),session:v.session,agent:v.agent,workspace:v.workspace}):await inspectCommand(options);
+  const result=mode==='run'?await runPrompt({...options,prompt:await promptFile(v['prompt-file']),session:v.session,agent:v.agent,workspace:v.workspace,managed:v.managed,bundle:v.bundle,provider:v.provider,model:v.model,effort:v.effort}):await inspectCommand(options);
   if(format==='text'){if(result.output)process.stdout.write(result.output+'\n');process.stderr.write(`${result.status}: ${result.commandId}\nSession ${result.session}\n${result.message??''}\n`);}else emit({type:'result',...result});
   process.exitCode=result.status==='completed'?0:['error','cancelled','rejected','not-sent'].includes(result.status)?1:result.status==='input-required'?4:3;
 }
