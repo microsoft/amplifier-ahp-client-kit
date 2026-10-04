@@ -33,6 +33,15 @@ owner before this packet is revised to promise it.
 | CK4 · CS4, HP4/6, CX3 | Headless commands save original identity/payload before creation/delivery. Reuse observes original work; unknown replies do not replay, approve or cancel accepted work. Receipt extensions are optional; standard bounded current-page observation remains available. | Lost reply sends another prompt; timeout cancels work; approval is silently granted; conflicting command reuse dispatches. | [headless tests](../test/headless.test.mjs): durable ownership, validation, installed host continuation, lost reply, approval, CLI and native continuation. [Managed creation tests](../test/managed-headless.test.mjs) bind configured aliases/revisions and distinct creation/input identities; [native CLI fixture](../test/managed-native.test.mjs) checks selected model and cold continuation. |
 | CK5 · HP2, WS3/4, CB1/4, CD5/6 | Keep cache/history authority separate; expose resource eviction and selected headless windows. Require independent packed-consumer evidence and explicit qualification limits. | Clearing a cache deletes history; a library test is reported as deployed browser/device acceptance. | Kit eviction test; installed headless checks; [qualification record](../docs/causal-journal-qualification.md). Whole UI working-set acceptance belongs to client owners. |
 
+Late standard-action acknowledgement extends CK2 through `bindDispatch` and
+`acceptEcho`: original wire correlation survives UI wait/reconnect without
+replaying effects. [Focused correlation checks](../test/intent-correlations.test.mjs)
+cover exact-origin/channel/action matching, storage-write failures, sequence reuse,
+private storage reopen/isolation and replay callbacks before duplicate filtering.
+The caller authenticates transport provenance and supplies isolated storage;
+missing original echoes and legacy unbound intents remain unknown. This does not
+supply a Host execution receipt or prove deployed Web acceptance.
+
 ## Consumer obligations
 
 - Buffer concurrently arriving actions during recovery/resource reads; apply them

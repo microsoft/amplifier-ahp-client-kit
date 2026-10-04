@@ -7,8 +7,10 @@ export async function openConnection({url,transportFactory=()=>WebSocketTranspor
  * refetched by the consumer. A missing local baseline always initializes afresh.
  * The caller buffers concurrently arriving events until this function resolves,
  * then applies them through ConfirmedResources (which discards duplicate echoes).
+ * onAction observes authenticated replay envelopes before reduction; snapshots
+ * supply no original-action acknowledgement. Live events remain caller-owned.
  */
-export async function recoverConnection(client,{store,clientId,subscriptions,initialized=false,protocolVersions=['0.9.0'],clientInfo,initialSubscriptions=['ahp-root://'],initializationMeta}){
- if(initialized&&store.hasBaseline(subscriptions)){const result=await client.reconnect({channel:'ahp-root://',clientId,lastSeenServerSeq:store.serverSeq,subscriptions:[...subscriptions]});if(result.type==='replay'){for(const action of result.actions)store.apply(action);for(const uri of result.missing)store.evict(uri);return {...result,discardPending:true};}store.clear();for(const snapshot of result.snapshots)store.snapshot(snapshot);return {...result,discardPending:true};}
+export async function recoverConnection(client,{store,clientId,subscriptions,initialized=false,protocolVersions=['0.9.0'],clientInfo,initialSubscriptions=['ahp-root://'],initializationMeta,onAction}){
+ if(initialized&&store.hasBaseline(subscriptions)){const result=await client.reconnect({channel:'ahp-root://',clientId,lastSeenServerSeq:store.serverSeq,subscriptions:[...subscriptions]});if(result.type==='replay'){for(const action of result.actions){await onAction?.(action);store.apply(action);}for(const uri of result.missing)store.evict(uri);return {...result,discardPending:true};}store.clear();for(const snapshot of result.snapshots)store.snapshot(snapshot);return {...result,discardPending:true};}
  const initialization=await client.initialize({channel:'ahp-root://',clientId,protocolVersions,clientInfo,initialSubscriptions,...(initializationMeta?{_meta:initializationMeta}:{})});if(!protocolVersions.includes(initialization.protocolVersion))throw Error('Host selected an unoffered AHP version');store.clear();for(const snapshot of initialization.snapshots)store.snapshot(snapshot);store.serverSeq=initialization.serverSeq;return {type:'initialize',initialization,subscriptions:new Set(initialSubscriptions),discardPending:true};
 }

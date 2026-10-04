@@ -113,3 +113,51 @@ real shared settings/keys against changes, and verifies bundle/instance/model/ef
 on an explicit input and cold continuation. It does not establish real account,
 remote model, current deployment or physical terminal acceptance. Failures retain
 the owned fixture; `AHP_HEADLESS_KEEP_FIXTURE=1` also retains success evidence.
+
+## Late action acknowledgement
+
+`IntentJournal.bindDispatch(id, {clientId, clientSeq})` binds an already admitted
+original intent to its wire identity and saves a bounded private lookup before
+sending. Both `begin(...).created` and `bindDispatch(...).created` must be true to
+permit that first dispatch. Binding reuse never permits another send. The
+journal retains a per-client sequence high-water mark, including after accepted
+lookups retire; full reloads may rotate the client ID. It preserves at most 128
+unresolved bindings and 4096 client IDs by default. Storage capacity rejects new
+binding without discarding unresolved work. The optional constructor argument
+`{scope, limit, maxBytes}` changes the correlation namespace and bounds; storage
+must still be partitioned by authenticated host/account/tab, with exclusive
+admission across distinct adapters or processes.
+
+```js
+const journal = new IntentJournal(privateScopedStorage);
+const admitted = await journal.begin(commandId, {channel, action});
+if (admitted.created) {
+  const bound = await journal.bindDispatch(commandId, {clientId, clientSeq});
+  if (bound.created) client.dispatch(bound.correlation.channel, bound.correlation.action, clientSeq);
+}
+// The caller supplies only envelopes from its authenticated host transport.
+const settled = await journal.acceptEcho(envelope);
+// null means no exact original acknowledgement; never dispatch again here.
+```
+
+`acceptEcho` matches the retained original `origin.clientId/clientSeq`, channel,
+and JSON-semantic action. It returns `null` for absent or mismatched correlation;
+an exact accepted/rejected echo durably settles only its original intent and
+returns `{id, status, intent, correlation}`. The intent retains the complete echo
+evidence and original binding. A failed settlement write leaves the lookup for
+later original evidence, without replay. If only lookup retirement fails, the
+confirmed verdict is returned with `retirementError`; it remains confirmed and
+an exact duplicate echo can finish cleanup. An incompatible later verdict cannot
+replace confirmed evidence. Ordinary `settle` also preserves dispatch/echo
+identity and cannot downgrade a confirmed echo outcome.
+
+Timeout and disconnect may discard UI promise waiters, never durable bindings.
+Call `acceptEcho` before resource reducer duplicate/baseline checks. For reconnect,
+`recoverConnection(..., {onAction: async envelope => ...})` awaits that callback
+for every replayed envelope before reducing it, including duplicate resource
+sequences. The Web consumer owns waiter completion and UI invalidation. Fresh
+snapshots, equal current values and missing original echoes never settle intent.
+A full reload with a new client ID can observe an older intent only if the
+protocol actually supplies its original authenticated origin envelope. Legacy
+unknown intents without a dispatch binding remain unknown; no scan, guessed
+binding, migration, implicit repair or resend is performed.
