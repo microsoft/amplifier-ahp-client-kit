@@ -28,5 +28,5 @@ jobs:
           npm init -y
           npm install --ignore-scripts "$RUNNER_TEMP/amplifier-ahp-client-kit-0.1.0.tgz" fake-indexeddb@6.2.5
           cp -R "$GITHUB_WORKSPACE/test" node_modules/@amplifier/ahp-client-kit/test
-          node --test node_modules/@amplifier/ahp-client-kit/test/*.test.mjs
+          (cd node_modules/@amplifier/ahp-client-kit && node --test test/*.test.mjs)
           ./node_modules/.bin/amplifier-ahp --help
