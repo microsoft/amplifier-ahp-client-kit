@@ -11,8 +11,9 @@ export interface HeadlessOptions {
 export interface HeadlessResult {
   commandId:string;session:string;
   status:'completed'|'error'|'cancelled'|'rejected'|'not-sent'|'input-required'|'running'|'unknown';
+  creationCommandId?:string;creationReceipt?:unknown;
   output?:string;usage?:unknown;receipt?:unknown;message?:string;errorCode?:number;
 }
 export function nodeTransport(options:{url:string;token?:string;ca?:string|Uint8Array;timeoutMs?:number}):Promise<AhpTransport>;
-export function runPrompt(options:HeadlessOptions&{prompt:string;session?:string;agent?:string;workspace?:string}):Promise<HeadlessResult>;
+export function runPrompt(options:HeadlessOptions&{prompt:string;session?:string;agent?:string;workspace?:string;managed?:boolean;bundle?:string;provider?:string;model?:string;effort?:string}):Promise<HeadlessResult>;
 export function inspectCommand(options:HeadlessOptions):Promise<HeadlessResult>;

@@ -4,6 +4,7 @@ import WebSocket from 'ws';
 import {WebSocketTransport} from '@microsoft/agent-host-protocol/ws';
 import {openConnection} from './connection.js';
 import {ConfirmedResources} from './resources.js';
+import {validateManaged,prepareManaged,managedRequest,confirmedManaged,recoverManaged} from './managed-headless.js';
 
 const ROOT='ahp-root://';
 const MAX_PROMPT_BYTES=1024*1024;
@@ -58,7 +59,23 @@ async function observe(options,record,dispatch){
   const observer=new Observer(options),deadline=Date.now()+options.timeoutMs;
   try{
     await observer.open();
-    if(dispatch&&record.create){
+    if(record.managed&&!dispatch&&!record.inputAttempted)return await recoverManaged(observer,record);
+    if(dispatch&&record.managed){
+      try{record.creationRequest=await prepareManaged(observer,record);}
+      catch{record.creationPhase='refused';record.inputNotSent=true;await options.storage.write('command:'+record.commandId,record);return {commandId:record.commandId,session:record.session,creationCommandId:record.creationCommandId,status:'not-sent',message:'Managed creation preflight failed. Check the advertised agent, bundle and provider instance. No creation or input was sent.'};}
+      record.creationPhase='requested';
+      await options.storage.write('command:'+record.commandId,record);
+      let created;
+      try{created=await managedRequest(observer.client,'create',record.creationRequest);}
+      catch(error){
+        if(error.data?.executed!==false)throw error;
+        record.creationPhase='refused';record.inputNotSent=true;await options.storage.write('command:'+record.commandId,record);
+        return {commandId:record.commandId,session:record.session,creationCommandId:record.creationCommandId,status:'not-sent',message:'The host refused managed creation before effects. No input was sent.'};
+      }
+      if(!confirmedManaged(created,record))throw Error('Managed creation proof differs from original request');
+      record.creationPhase='confirmed';
+      await options.storage.write('command:'+record.commandId,record);
+    }else if(dispatch&&record.create){
       await observer.client.request('createSession',{channel:record.session,...(record.agent?{provider:record.agent}:{}),...(record.workspace?{workingDirectories:[record.workspace.startsWith('file:')?record.workspace:pathToFileURL(record.workspace).href]}:{})});
     }
     const session=await observer.subscribe(record.session);record.channel=session.defaultChat;
@@ -66,7 +83,8 @@ async function observe(options,record,dispatch){
     await observer.subscribe(record.channel);
     if(dispatch){
       if(observer.store.resources.get(record.channel)?.activeTurn)return {commandId:record.commandId,session:record.session,status:'not-sent',message:'This session already has an active turn.'};
-      // A durable record exists before either creation or this notification.
+      // Mark attempted before delivery: a lost reply can only inspect this input.
+      if(record.managed)record.inputAttempted=true;
       await options.storage.write('command:'+record.commandId,record);
       observer.client.dispatch(record.channel,{type:'chat/turnStarted',turnId:record.commandId,startedAt:record.startedAt,message:{text:record.prompt,origin:{kind:'user'}}});
     }
@@ -81,7 +99,10 @@ async function observe(options,record,dispatch){
       if(observer.closed||Date.now()>=deadline)return {...result,message:observer.closed?'Connection closed; inspect this command to recover without resubmitting.':'Wait limit reached. The session remains available; no cancellation was sent.'};
       await observer.wait(Math.min(1000,Math.max(1,deadline-Date.now())));
     }
-  }catch(error){return {commandId:record.commandId,session:record.session,status:'unknown',message:'The outcome is unconfirmed. Inspect the saved command before taking further action.',errorCode:typeof error.code==='number'?error.code:undefined};}
+  }catch(error){
+    // A settled local failure can prove non-delivery; an in-flight journal cannot.
+    if(dispatch&&record.managed&&!record.inputAttempted){record.inputNotSent=true;try{await options.storage.write('command:'+record.commandId,record);}catch{}}
+    return {commandId:record.commandId,session:record.session,...(record.managed?{creationCommandId:record.creationCommandId}:{}),status:'unknown',message:'The outcome is unconfirmed. Inspect the saved command before taking further action.',errorCode:typeof error.code==='number'?error.code:undefined};}
   finally{observer.close();}
 }
 
@@ -93,16 +114,16 @@ function validate(options){
 
 /** One durable admission. Reusing an identity only observes the original command. */
 export async function runPrompt(options){
-  options={timeoutMs:300000,...options};validate(options);
+  options={timeoutMs:300000,...options};validate(options);validateManaged(options);
   if(typeof options.prompt!=='string'||!options.prompt.trim()||Buffer.byteLength(options.prompt)>MAX_PROMPT_BYTES)throw Error('Prompt must be nonempty and at most 1 MiB');
   const existing=await options.storage.read('command:'+options.commandId);
-  if(existing){if(existing.host!==options.url||existing.prompt!==options.prompt||existing.session!==(options.session??existing.session)||existing.agent!==options.agent||existing.workspace!==options.workspace)throw Error('Command ID already belongs to a different input');return observe(options,existing,false);}
+  if(existing){if(existing.host!==options.url||existing.prompt!==options.prompt||existing.session!==(options.session??existing.session)||existing.agent!==options.agent||existing.workspace!==options.workspace||Boolean(existing.managed)!==Boolean(options.managed)||['bundle','provider','model','effort'].some(key=>existing[key]!==options[key]))throw Error('Command ID already belongs to a different input');return observe(options,existing,false);}
   const release=await options.storage.claim('command:'+options.commandId);
   try{
     if(await options.storage.read('command:'+options.commandId))throw Error('Command was concurrently saved. Inspect its outcome.');
     if(options.session&&!/^ahp-session:\/[A-Za-z0-9_-]{1,200}$/.test(options.session))throw Error('Invalid AHP session URI');
     if(options.session&&(options.agent||options.workspace))throw Error('An existing session retains its original agent and workspace');
-    const record={commandId:options.commandId,host:options.url,session:options.session??`ahp-session:/${randomUUID()}`,create:!options.session,prompt:options.prompt,agent:options.agent,workspace:options.workspace,startedAt:new Date().toISOString()};
+    const record={commandId:options.commandId,host:options.url,session:options.session??`ahp-session:/${randomUUID()}`,create:!options.session,prompt:options.prompt,agent:options.agent,workspace:options.workspace,...(options.managed?{managed:true,creationCommandId:randomUUID(),bundle:options.bundle,provider:options.provider,model:options.model,effort:options.effort}:{}),startedAt:new Date().toISOString()};
     await options.storage.write('command:'+options.commandId,record);
     options.onStarted?.({commandId:record.commandId,session:record.session});
     return await observe(options,record,true);
