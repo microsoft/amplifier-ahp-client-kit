@@ -137,14 +137,15 @@ if (admitted.created) {
 }
 // The caller supplies only envelopes from its authenticated host transport.
 const settled = await journal.acceptEcho(envelope);
-// null means no exact original acknowledgement; never dispatch again here.
+// null means no original semantic confirmation; never dispatch again here.
 ```
 
 `acceptEcho` matches the retained original `origin.clientId/clientSeq`, channel,
 and JSON-semantic action. It returns `null` for absent or mismatched correlation;
-an exact accepted/rejected echo durably settles only its original intent and
-returns `{id, status, intent, correlation}`. The intent retains the complete echo
-evidence and original binding. A failed settlement write leaves the lookup for
+a semantically matching accepted/rejected echo durably settles only its original intent and
+returns `{id, status, intent, correlation}`. The receipt retains the original submitted action, origin, server sequence,
+verdict and original binding. Server-added metadata remains in canonical AHP
+resource state; it does not replace the saved intent or create another journal. A failed settlement write leaves the lookup for
 later original evidence, without replay. If only lookup retirement fails, the
 confirmed verdict is returned with `retirementError`; it remains confirmed and
 an exact duplicate echo can finish cleanup. An incompatible later verdict cannot
