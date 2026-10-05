@@ -161,3 +161,18 @@ A full reload with a new client ID can observe an older intent only if the
 protocol actually supplies its original authenticated origin envelope. Legacy
 unknown intents without a dispatch binding remain unknown; no scan, guessed
 binding, migration, implicit repair or resend is performed.
+
+### Extensible metadata and original intent confirmation
+
+A correlated AHP server action may add plain-object `_meta` fields, including
+nested metadata members. Durable confirmation still requires the original
+client/sequence, channel, isolated storage binding, action type and semantic
+payload. Every caller-provided metadata field and value must remain present
+and unchanged; arrays remain exact. Extra non-metadata fields, changed text,
+IDs, kinds, scope or captured turn bindings do not confirm the intent.
+
+This is a narrow additive-metadata rule, not universal acceptance of server
+normalization. Official SDK acknowledgement/reduction and the private journal's
+semantic confirmation remain separate. A mismatched result stays unknown and is
+never replayed. Derived metadata for queued and steering messages uses the same
+rule; there is no action-specific receipt store.
