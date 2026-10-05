@@ -11,6 +11,20 @@ function canonical(value){
  throw Error('Exact JSON action required for intent correlation');
 }
 const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+// AHP permits additive extensible metadata in a server action. Confirm only
+// the original semantic payload: every original field/value remains exact,
+// while plain-object _meta fields may acquire additional object members.
+// Arrays and non-object values remain exact, including inside metadata.
+function sameSubmittedAction(original,echo){
+ const submitted=canonical(original),received=canonical(echo);
+ function contains(a,b,metadata=false){
+  if(!object(a)||!object(b))return same(a,b);
+  for(const key of Object.keys(a))if(!Object.hasOwn(b,key)||!contains(a[key],b[key],metadata||key==='_meta'))return false;
+  for(const key of Object.keys(b))if(!Object.hasOwn(a,key)&&!metadata&&(key!=='_meta'||!object(b[key])))return false;
+  return true;
+ }
+ return contains(submitted,received);
+}
 const ownKeys=(value,keys)=>object(value)&&same(Object.keys(value).sort(),[...keys].sort());
 const bindingKeys=['intentId','clientId','clientSeq','channel','action'];
 function validBinding(row){return ownKeys(row,bindingKeys)&&token(row.intentId)&&token(row.clientId)&&token(row.channel)&&Number.isSafeInteger(row.clientSeq)&&row.clientSeq>0&&object(row.action)&&token(row.action.type);}
@@ -66,7 +80,7 @@ export class IntentCorrelations {
   return exclusive(this.storage,this.key,async()=>{
    const state=await this.load(),row=state.entries.find(item=>item.clientId===echo.origin.clientId&&item.clientSeq===echo.origin.clientSeq);
    if(!row)return {matched:false,reason:'no-original-correlation'};
-   if(row.channel!==echo.channel||!same(row.action,echo.action))return {matched:false,reason:'original-action-mismatch'};
+   if(row.channel!==echo.channel||!sameSubmittedAction(row.action,echo.action))return {matched:false,reason:'original-action-mismatch'};
    const status=echo.rejectionReason===undefined?'accepted':'rejected';
    const receipt={scope:this.scope,channel:row.channel,action:row.action,origin:{clientId:row.clientId,clientSeq:row.clientSeq},serverSeq:echo.serverSeq,...(echo.rejectionReason===undefined?{}:{rejectionReason:echo.rejectionReason})};
    const result=await exclusive(this.storage,`intent:${row.intentId}`,async()=>{

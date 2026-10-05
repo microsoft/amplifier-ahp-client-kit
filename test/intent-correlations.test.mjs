@@ -84,3 +84,18 @@ test('scoped IndexedDB close/reopen retains original wire identity and isolates 
  const store=new ScopedIndexedDBStore(options),j=new IntentJournal(store),row=await admit(j);store.close();
  const restored=new ScopedIndexedDBStore(options),other=new ScopedIndexedDBStore({...options,account:'account-b'});try{assert.equal(await new IntentJournal(other).acceptEcho(envelope(row)),null);assert.equal((await new IntentJournal(restored).acceptEcho(envelope(row))).status,'accepted');}finally{restored.close();other.close();}
 });
+
+test('additive recursive metadata confirms steering and queued payloads while preserving original journal action',async()=>{
+ for(const kind of ['steering','queued'])for(const held of [false,true]){
+  const storage=new MemoryStorage(),j=new IntentJournal(storage),action={type:'chat/pendingMessageSet',kind,id:'original',message:{text:'Original correction',origin:{kind:'user'},_meta:{'amplifier.dev/steering':{activeTurnId:'A'},owned:{scope:'project',nested:{bound:'original'}}}}};
+  await j.begin('original',{channel:'chat',action});const row=(await j.bindDispatch('original',wire)).correlation;
+  const added=structuredClone(action);added._meta={server:{version:1}};added.message._meta['amplifier.dev/steering'].held=held;added.message._meta.owned.nested.extra={server:true};added.message._meta['amplifier.dev/queue']={held};
+  assert.equal((await j.acceptEcho(envelope(row,{action:added}))).status,'accepted');assert.deepEqual((await j.read('original')).action,action);assert.deepEqual((await j.read('original')).echoReceipt.action,action);assert.equal((await j.begin('original',{channel:'chat',action:{...action,id:'replacement'}})).created,false);
+ }
+});
+test('metadata enrichment cannot change or remove original semantic fields, binding, scope, provenance, or arrays',async()=>{
+ const action={type:'chat/pendingMessageSet',kind:'steering',id:'original',message:{text:'Original text',origin:{kind:'user'},_meta:{'amplifier.dev/steering':{activeTurnId:'A'},owned:{scope:'project',values:[1,2],nested:{bound:true}}}}};
+ const changes=[a=>a.message.text='Changed',a=>a.id='other',a=>a.kind='queued',a=>a.type='chat/pendingMessageRemoved',a=>a.message._meta['amplifier.dev/steering'].activeTurnId='B',a=>delete a.message._meta['amplifier.dev/steering'].activeTurnId,a=>a.message._meta.owned.scope='global',a=>a.message._meta.owned.nested.bound=false,a=>a.message._meta.owned.values.push(3),a=>a.message._meta.owned.values.reverse(),a=>a.extra='not metadata',a=>a.message._meta=null,a=>delete a.message._meta];
+ for(const change of changes){const storage=new MemoryStorage(),j=new IntentJournal(storage);await j.begin('original',{channel:'chat',action});const row=(await j.bindDispatch('original',wire)).correlation,changed=structuredClone(action);change(changed);assert.equal(await j.acceptEcho(envelope(row,{action:changed})),null);assert.equal((await j.read('original')).status,'unknown');assert.deepEqual((await j.read('original')).action,action);assert.equal((await j.acceptEcho(envelope(row))).status,'accepted')}
+ for(const changed of [{origin:{...wire,clientId:'other'}},{origin:{...wire,clientSeq:2}},{channel:'other'}]){const j=new IntentJournal(new MemoryStorage());await j.begin('original',{channel:'chat',action});const row=(await j.bindDispatch('original',wire)).correlation;assert.equal(await j.acceptEcho(envelope(row,changed)),null);assert.equal((await j.read('original')).status,'unknown')}
+});

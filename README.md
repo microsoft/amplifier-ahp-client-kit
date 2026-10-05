@@ -137,14 +137,15 @@ if (admitted.created) {
 }
 // The caller supplies only envelopes from its authenticated host transport.
 const settled = await journal.acceptEcho(envelope);
-// null means no exact original acknowledgement; never dispatch again here.
+// null means no original semantic confirmation; never dispatch again here.
 ```
 
 `acceptEcho` matches the retained original `origin.clientId/clientSeq`, channel,
 and JSON-semantic action. It returns `null` for absent or mismatched correlation;
-an exact accepted/rejected echo durably settles only its original intent and
-returns `{id, status, intent, correlation}`. The intent retains the complete echo
-evidence and original binding. A failed settlement write leaves the lookup for
+a semantically matching accepted/rejected echo durably settles only its original intent and
+returns `{id, status, intent, correlation}`. The receipt retains the original submitted action, origin, server sequence,
+verdict and original binding. Server-added metadata remains in canonical AHP
+resource state; it does not replace the saved intent or create another journal. A failed settlement write leaves the lookup for
 later original evidence, without replay. If only lookup retirement fails, the
 confirmed verdict is returned with `retirementError`; it remains confirmed and
 an exact duplicate echo can finish cleanup. An incompatible later verdict cannot
@@ -161,3 +162,18 @@ A full reload with a new client ID can observe an older intent only if the
 protocol actually supplies its original authenticated origin envelope. Legacy
 unknown intents without a dispatch binding remain unknown; no scan, guessed
 binding, migration, implicit repair or resend is performed.
+
+### Extensible metadata and original intent confirmation
+
+A correlated AHP server action may add plain-object `_meta` fields, including
+nested metadata members. Durable confirmation still requires the original
+client/sequence, channel, isolated storage binding, action type and semantic
+payload. Every caller-provided metadata field and value must remain present
+and unchanged; arrays remain exact. Extra non-metadata fields, changed text,
+IDs, kinds, scope or captured turn bindings do not confirm the intent.
+
+This is a narrow additive-metadata rule, not universal acceptance of server
+normalization. Official SDK acknowledgement/reduction and the private journal's
+semantic confirmation remain separate. A mismatched result stays unknown and is
+never replayed. Derived metadata for queued and steering messages uses the same
+rule; there is no action-specific receipt store.
