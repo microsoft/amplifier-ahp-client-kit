@@ -24,7 +24,7 @@ async function host(mode='normal'){
    assert.deepEqual(p.args.args,{name:'fixture_permit',arguments:{value:'kept'}});
    receipt={channel:p.channel,commandId:p.commandId,status:'completed'};
    if(mode==='lost'){socket.close();return;}
-   send({accepted:mode!=='refused',result:mode==='denied'?{success:false,error:{message:'Denied by policy'}}:{callId:'one-call',result:{success:true,output:'kept'}}});
+   send(mode==='missing-result'?{accepted:true}:{accepted:mode!=='refused',result:mode==='denied'?{callId:'denied-call',success:false,error:{message:'Denied by policy'}}:{callId:'one-call',result:{success:true,output:'kept'}}});
   }else if(m.method==='x-commandReceipt'){
    if(!receipt){socket.send(JSON.stringify({jsonrpc:'2.0',id:m.id,error:{code:-32008,message:'No receipt'}}));return;}
    send(mode==='wrong-receipt'?{...receipt,channel:'ahp-session:/different'}:receipt);
@@ -49,7 +49,7 @@ test('lost tool reply inspects only original receipt without claiming missing re
   await runTool(o);assert.equal(f.calls.filter(m=>m.method==='x-amplifier/capabilityAction').length,1);
  }finally{await f.close()}
 });
-for(const [mode,status] of [['unsupported','not-sent'],['busy','not-sent'],['denied','error'],['refused','rejected']])test(mode+' tool outcome stays honest',async()=>{
+for(const [mode,status] of [['unsupported','not-sent'],['busy','not-sent'],['denied','error'],['refused','rejected'],['missing-result','unknown']])test(mode+' tool outcome stays honest',async()=>{
  const f=await host(mode);try{const o={...base,url:f.url,storage:storage()};assert.equal((await runTool(o)).status,status);
   await inspectCommand(o);assert.equal(f.calls.filter(m=>m.method==='x-amplifier/capabilityAction').length,['unsupported','busy'].includes(mode)?0:1);
  }finally{await f.close()}

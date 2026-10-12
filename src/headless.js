@@ -96,7 +96,7 @@ async function observe(options,record,dispatch){
       if(record.kind==='tool'){
         const action=observer.initialization._meta['amplifier.dev/capabilities'].actions['runtime.control'];
         const response=await observer.client.request(action.method,{channel:record.session,topic:action.topic,operation:action.operation,version:1,commandId:record.commandId,args:{operation:'tool.invoke',args:{name:record.tool,arguments:record.arguments}}});
-        if(typeof response?.accepted!=='boolean')throw Error('Tool admission was not confirmed');
+        if(typeof response?.accepted!=='boolean'||response.accepted&&(typeof response.result?.callId!=='string'||!response.result.callId))throw Error('Tool completion was not confirmed');
         const failed=response.result?.success===false||response.result?.result?.success===false;
         record.result={commandId:record.commandId,session:record.session,status:!response.accepted?'rejected':failed?'error':'completed',result:response.result,output:JSON.stringify(response.result??null)};
         await options.storage.write('command:'+record.commandId,record);
