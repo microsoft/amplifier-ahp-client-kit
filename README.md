@@ -16,6 +16,11 @@ change an earlier submitted write. Unsupported values reject without a saved
 record; a later explicit valid write remains possible. File storage supports
 JSON values; browser storage supports structured-clone values, including blobs.
 
+The browser store reopens a closed connection once only when transaction creation
+fails before any request is admitted. Created transactions are never replayed:
+abort, quota and request failures reject normally and retain the caller's existing
+recovery boundary. Connection recovery does not dispatch or resubmit host work.
+
 ```js
 import {ConfirmedResources, openConnection, recoverConnection, IntentJournal} from '@amplifier/ahp-client-kit';
 const store = new ConfirmedResources();
