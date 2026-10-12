@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
 import WebSocket from 'ws';
 import {WebSocketTransport} from '@microsoft/agent-host-protocol/ws';
 import {openConnection} from './connection.js';
@@ -56,9 +57,15 @@ function outcome(observer,record){
 }
 
 async function observe(options,record,dispatch){
+  if(record.kind==='tool'&&record.result)return structuredClone(record.result);
   const observer=new Observer(options),deadline=Date.now()+options.timeoutMs;
   try{
     await observer.open();
+    if(record.kind==='tool'&&!dispatch)return await inspectToolReceipt(observer,record);
+    if(record.kind==='tool'){
+      const action=observer.initialization._meta?.['amplifier.dev/capabilities']?.actions?.['runtime.control'];
+      if(action?.topic!=='runtime-control'||action.operation!=='runtime.control'||typeof action.method!=='string')return {commandId:record.commandId,session:record.session,status:'not-sent',message:'This host does not advertise configured tool invocation. No tool was invoked.'};
+    }
     if(record.managed&&!dispatch&&!record.inputAttempted)return await recoverManaged(observer,record);
     if(dispatch&&record.managed){
       try{record.creationRequest=await prepareManaged(observer,record);}
@@ -86,6 +93,15 @@ async function observe(options,record,dispatch){
       // Mark attempted before delivery: a lost reply can only inspect this input.
       if(record.managed)record.inputAttempted=true;
       await options.storage.write('command:'+record.commandId,record);
+      if(record.kind==='tool'){
+        const action=observer.initialization._meta['amplifier.dev/capabilities'].actions['runtime.control'];
+        const response=await observer.client.request(action.method,{channel:record.session,topic:action.topic,operation:action.operation,version:1,commandId:record.commandId,args:{operation:'tool.invoke',args:{name:record.tool,arguments:record.arguments}}});
+        if(typeof response?.accepted!=='boolean'||response.accepted&&(typeof response.result?.callId!=='string'||!response.result.callId))throw Error('Tool completion was not confirmed');
+        const failed=response.result?.success===false||response.result?.result?.success===false;
+        record.result={commandId:record.commandId,session:record.session,status:!response.accepted?'rejected':failed?'error':'completed',result:response.result,output:JSON.stringify(response.result??null)};
+        await options.storage.write('command:'+record.commandId,record);
+        return structuredClone(record.result);
+      }
       observer.client.dispatch(record.channel,{type:'chat/turnStarted',turnId:record.commandId,startedAt:record.startedAt,message:{text:record.prompt,origin:{kind:'user'}}});
     }
     while(true){
@@ -106,6 +122,18 @@ async function observe(options,record,dispatch){
   finally{observer.close();}
 }
 
+async function inspectToolReceipt(observer,record){
+  const base={commandId:record.commandId,session:record.session,status:'unknown'};
+  const method=observer.initialization._meta?.['amplifier.dev/host']?.receipts?.method;
+  if(!method)return {...base,message:'This host does not advertise receipt inspection. No tool was invoked again.'};
+  let receipt;
+  try{receipt=await observer.client.request(method,{commandId:record.commandId});}
+  catch(error){if(error.code!==-32008)throw error;return {...base,message:'No original tool receipt was found. No tool was invoked again.'};}
+  if(receipt?.channel!==record.session||receipt.commandId!==record.commandId)throw Error('Tool receipt changed its original identity');
+  // A host receipt confirms admission, not the missing result bytes or success of the tool.
+  return {...base,receipt,message:'The original tool receipt was retrieved. Its result was not saved by this client; no tool was invoked again.'};
+}
+
 function validate(options){
   if(!options.storage?.claim)throw Error('A durable command storage with exclusive claims is required');
   if(typeof options.commandId!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(options.commandId))throw Error('Command ID must use 1–128 letters, digits, underscores or hyphens');
@@ -116,14 +144,27 @@ function validate(options){
 export async function runPrompt(options){
   options={timeoutMs:300000,...options};validate(options);validateManaged(options);
   if(typeof options.prompt!=='string'||!options.prompt.trim()||Buffer.byteLength(options.prompt)>MAX_PROMPT_BYTES)throw Error('Prompt must be nonempty and at most 1 MiB');
+  return runInput(options);
+}
+
+/** Explicit configured-tool invocation through the advertised host and native policy path. */
+export async function runTool(options){
+  options={timeoutMs:300000,...options,arguments:structuredClone(options.arguments===undefined?{}:options.arguments)};validate(options);validateManaged(options);
+  if(typeof options.tool!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(options.tool))throw Error('A configured tool name is required');
+  if(!options.arguments||typeof options.arguments!=='object'||Array.isArray(options.arguments)||Buffer.byteLength(JSON.stringify(options.arguments))>65536)throw Error('Tool arguments must be a JSON object of at most 64 KiB');
+  options.arguments=JSON.parse(JSON.stringify(options.arguments));
+  return runInput(options,'tool');
+}
+
+async function runInput(options,kind){
   const existing=await options.storage.read('command:'+options.commandId);
-  if(existing){if(existing.host!==options.url||existing.prompt!==options.prompt||existing.session!==(options.session??existing.session)||existing.agent!==options.agent||existing.workspace!==options.workspace||Boolean(existing.managed)!==Boolean(options.managed)||['bundle','provider','model','effort'].some(key=>existing[key]!==options[key]))throw Error('Command ID already belongs to a different input');return observe(options,existing,false);}
+  if(existing){if(existing.kind!==kind||existing.host!==options.url||existing.prompt!==options.prompt||existing.tool!==options.tool||!isDeepStrictEqual(existing.arguments,options.arguments)||existing.session!==(options.session??existing.session)||existing.agent!==options.agent||existing.workspace!==options.workspace||Boolean(existing.managed)!==Boolean(options.managed)||['bundle','provider','model','effort'].some(key=>existing[key]!==options[key]))throw Error('Command ID already belongs to a different input');return observe(options,existing,false);}
   const release=await options.storage.claim('command:'+options.commandId);
   try{
     if(await options.storage.read('command:'+options.commandId))throw Error('Command was concurrently saved. Inspect its outcome.');
     if(options.session&&!/^ahp-session:\/[A-Za-z0-9_-]{1,200}$/.test(options.session))throw Error('Invalid AHP session URI');
     if(options.session&&(options.agent||options.workspace))throw Error('An existing session retains its original agent and workspace');
-    const record={commandId:options.commandId,host:options.url,session:options.session??`ahp-session:/${randomUUID()}`,create:!options.session,prompt:options.prompt,agent:options.agent,workspace:options.workspace,...(options.managed?{managed:true,creationCommandId:randomUUID(),bundle:options.bundle,provider:options.provider,model:options.model,effort:options.effort}:{}),startedAt:new Date().toISOString()};
+    const record={commandId:options.commandId,host:options.url,session:options.session??`ahp-session:/${randomUUID()}`,create:!options.session,...(kind==='tool'?{kind,tool:options.tool,arguments:options.arguments}:{prompt:options.prompt}),agent:options.agent,workspace:options.workspace,...(options.managed?{managed:true,creationCommandId:randomUUID(),bundle:options.bundle,provider:options.provider,model:options.model,effort:options.effort}:{}),startedAt:new Date().toISOString()};
     await options.storage.write('command:'+options.commandId,record);
     options.onStarted?.({commandId:record.commandId,session:record.session});
     return await observe(options,record,true);

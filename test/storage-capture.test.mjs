@@ -8,6 +8,13 @@ const entry=process.env.AHP_STORAGE_PACKAGE_ENTRY;
 const {ScopedIndexedDBStore}=await import(entry?new URL('./indexeddb.js',entry):'../src/indexeddb.js');
 const {FileStorage}=await import(entry?new URL('./file-storage.js',entry):'../src/file-storage.js');
 const draft=()=>({name:'original',routing:{roles:{general:{candidates:[{provider:'fixture',model:'original-model'}]}}},bytes:new Uint8Array([1,2,3])});
+test('transaction error exposes the failing request before transaction.error is set',async()=>{
+ const store=new ScopedIndexedDBStore({host:'fixture',account:'fixture',tab:'failure'}),failure=new DOMException('Cannot store file','UnknownError');
+ let attempts=0;
+ store.db={transaction(){const tx={error:null,objectStore:()=>({put(){queueMicrotask(()=>{if(!attempts++){tx.onerror({target:{error:failure}});tx.onabort();}else tx.oncomplete();});}})};return tx;}};
+ await assert.rejects(store.write('file',{bytes:[1]}),error=>error===failure);
+ await store.write('later',{bytes:[2]});
+});
 function edit(value){value.name='later edit';value.routing.roles.general.candidates[0].model='later-model';value.bytes[0]=9;}
 test('browser private write captures nested draft and bytes before queued durability',async()=>{
  const store=new ScopedIndexedDBStore({host:'fixture-host',account:'fixture-account',tab:crypto.randomUUID(),indexedDB});

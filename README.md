@@ -16,6 +16,11 @@ change an earlier submitted write. Unsupported values reject without a saved
 record; a later explicit valid write remains possible. File storage supports
 JSON values; browser storage supports structured-clone values, including blobs.
 
+The browser store reopens a closed connection once only when transaction creation
+fails before any request is admitted. Created transactions are never replayed:
+abort, quota and request failures reject normally and retain the caller's existing
+recovery boundary. Connection recovery does not dispatch or resubmit host work.
+
 ```js
 import {ConfirmedResources, openConnection, recoverConnection, IntentJournal} from '@amplifier/ahp-client-kit';
 const store = new ConfirmedResources();
@@ -49,6 +54,26 @@ amplifier-ahp run --server wss://your-host/ahp --token-file host-token.txt \
 amplifier-ahp inspect --server wss://your-host/ahp --token-file host-token.txt \
   --command first-input --output json
 ```
+
+`run "prompt"` also accepts a positional prompt; `continue "prompt" --resume
+ahp-session:/ID` continues that exact conversation. `--output-format json-trace`
+maps to the bounded JSONL trace, and `--timeout` accepts whole seconds.
+Configured tools can be called without a model turn:
+
+```sh
+amplifier-ahp tool TOOL_NAME --args '{"text":"example"}' \
+  --server wss://your-host/ahp --token-file host-token.txt \
+  --session ahp-session:/SESSION_ID --command one-tool --output json
+```
+
+The advertised native control owns schema validation, hooks, approval and execution.
+No host support or an active response prevents invocation. A successful result is
+saved in the private command journal and is returned by subsequent inspection.
+If delivery was uncertain, inspection reads only the original host receipt; a
+completed admission receipt cannot reconstruct missing result bytes or prove tool
+success. A tool command never starts a model turn, grants permission, or retries
+an effect automatically. Use a new command identity only for an explicitly new
+invocation. New-session selection options apply equally to tasks and tools.
 
 `--agent` selects a host-advertised ACP agent for a new session. A resumed
 session keeps its original agent, workspace and configuration. Hosts advertising
