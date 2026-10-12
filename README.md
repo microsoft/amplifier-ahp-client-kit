@@ -50,6 +50,26 @@ amplifier-ahp inspect --server wss://your-host/ahp --token-file host-token.txt \
   --command first-input --output json
 ```
 
+`run "prompt"` also accepts a positional prompt; `continue "prompt" --resume
+ahp-session:/ID` continues that exact conversation. `--output-format json-trace`
+maps to the bounded JSONL trace, and `--timeout` accepts whole seconds.
+Configured tools can be called without a model turn:
+
+```sh
+amplifier-ahp tool TOOL_NAME --args '{"text":"example"}' \
+  --server wss://your-host/ahp --token-file host-token.txt \
+  --session ahp-session:/SESSION_ID --command one-tool --output json
+```
+
+The advertised native control owns schema validation, hooks, approval and execution.
+No host support or an active response prevents invocation. A successful result is
+saved in the private command journal and is returned by subsequent inspection.
+If delivery was uncertain, inspection reads only the original host receipt; a
+completed admission receipt cannot reconstruct missing result bytes or prove tool
+success. A tool command never starts a model turn, grants permission, or retries
+an effect automatically. Use a new command identity only for an explicitly new
+invocation. New-session selection options apply equally to tasks and tools.
+
 `--agent` selects a host-advertised ACP agent for a new session. A resumed
 session keeps its original agent, workspace and configuration. Hosts advertising
 `managedCreation` v1 also support new managed chats with configured bundle aliases
