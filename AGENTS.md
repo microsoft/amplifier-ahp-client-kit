@@ -1,5 +1,7 @@
 # Client kit contributor entry point
 
+This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
+
 Read [README](README.md), [local vision](docs/VISION.md) and
 [contract v1](contracts/client-kit.v1.md) before changing behavior. The shared
 approved family direction owns product promises; upstream AHP owns wire schemas,
