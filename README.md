@@ -57,6 +57,27 @@ The [client contract](contracts/client-kit.v1.md) describes integration obligati
 [AHP](https://microsoft.github.io/agent-host-protocol/) defines the wire protocol.
 File-storage durability is currently qualified on POSIX systems.
 
+
+<!-- ecosystem-map:start -->
+## Where this fits
+
+A reusable AHP client library and headless CLI, used by independently owned experiences.
+
+Supports: Experience, Connection.
+
+![Ecosystem roles and component relationships](docs/ecosystem-map.svg)
+
+[Open the map](docs/ecosystem-map.svg) · [Product page source (private)](docs/product/index.html) · [Map guide](https://github.com/microsoft/amplifier-constellation/blob/main/docs/ecosystem-maps.md)
+
+<details>
+<summary>The five shared building blocks</summary>
+
+[![Experience, Conversation, Agent Instance, Connection and Tool](https://raw.githubusercontent.com/microsoft/amplifier-constellation/main/site/assets/art/building-blocks.png)](https://microsoft.github.io/amplifier-constellation/)
+
+</details>
+
+<!-- ecosystem-map:end -->
+
 ## Contributing
 
 Most contributions require you to agree to a
