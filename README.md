@@ -1,179 +1,80 @@
-# Amplifier client kit
+# Amplifier AHP client kit
 
-Start with the [local vision](docs/VISION.md), [contract v1](contracts/client-kit.v1.md) and [contributor entry point](AGENTS.md). They apply the approved family direction; qualification is recorded separately.
+Build JavaScript clients for an Agent Host Protocol (AHP) server, or submit work
+from the included command-line client. The kit provides connection recovery,
+confirmed resource state and private storage for drafts and request records.
+The host runs the agent; this package does not load an agent runtime in the client.
 
-Protocol and persistence primitives for independent JavaScript clients. No React, web product selectors, native runtime imports, or sibling checkout dependencies.
+## Get started with the command-line client
 
-- `ConfirmedResources`: official AHP reducers, per-resource confirmed baselines, duplicate sequence suppression, explicit missing-baseline result and eviction.
-- `openConnection`: transport-agnostic official AHP JSON-RPC client; event reader registered before handshake.
-- `recoverConnection`: upstream initialize/reconnect snapshot/replay flow, missing baseline fresh initialization, explicit pending-action discard signal. Catalog refresh and reconnect retry timing remain the caller's application policy.
-- `IntentJournal`: captures the original target/action before asynchronous storage, records intent durably before dispatch, and serializes admission and settlement per identity on the same storage adapter. Settlement preserves original identity/payload and earlier receipt details; it never retries unknown work. The storage contract is asynchronous `read(key)` and durable `write(key,value)`.
-- `@amplifier/ahp-client-kit/indexeddb`: scoped browser store, isolated by host/account/tab, for private drafts, blobs, journal records and optional disposable caches. Consumers supply their authenticated nonsecret account identity.
-
-Browser and file writes capture their supported value before waiting for storage
-readiness or queued durability. Later edits to a private draft object cannot
-change an earlier submitted write. Unsupported values reject without a saved
-record; a later explicit valid write remains possible. File storage supports
-JSON values; browser storage supports structured-clone values, including blobs.
-
-```js
-import {ConfirmedResources, openConnection, recoverConnection, IntentJournal} from '@amplifier/ahp-client-kit';
-const store = new ConfirmedResources();
-const {client, events} = await openConnection({url: 'ws://localhost:8765/ahp'});
-const handshake = await recoverConnection(client, {store, clientId: crypto.randomUUID(), subscriptions: new Set(['ahp-root://'])});
-// Buffer events while recovering, then apply the buffer. Refresh listSessions.
-// On every reconnect clear pending optimistic actions; keep durable intent.
-```
-
-AHP is normative: https://microsoft.github.io/agent-host-protocol/ . This package does not add a wire protocol, own sessions, guarantee exactly-once effects, or decide how an app renders state. Applications must not interpret the global sequence's gaps as missing subscribed-resource actions. Consumers must cap resource interest and durable storage retention according to their requirements. Never silently truncate authoritative state; unsubscribe/resubscribe when disposing a baseline.
-
-`npm ci && npm test` runs independently without model accounts. `npm pack` produces the publishable package. Qualification currently installs the resulting archive in the web consumer; no registry publication is implied.
-
-The intended repository is `microsoft/amplifier-ahp-client-kit`. Repository metadata names the intended publication destination; no remote or registry publication is implied.
-
-## Noninteractive client
-
-The installed `amplifier-ahp` executable uses Node 22.16+ and the same public AHP
-surface as interactive clients. It submits through the host's configured agent,
-including its real provider/model defaults. It never loads a native runtime in the
-client. Headless helpers are available from the optional `./headless` and
-`./file-storage` entrypoints; `./cli` is the executable entrypoint for distribution launchers. importing the browser entrypoint does not load Node
-storage or WebSocket implementations.
+Use Node.js 22.16+ and an existing AHP host with an agent configured. From a checkout:
 
 ```sh
-amplifier-ahp run --server wss://your-host/ahp --token-file host-token.txt \
-  --workspace /host/work/project --prompt-file request.txt --command first-input
-amplifier-ahp run --server wss://your-host/ahp --token-file host-token.txt \
-  --session ahp-session:/SESSION_ID --prompt-file follow-up.txt --command next-input \
-  --output json
-amplifier-ahp inspect --server wss://your-host/ahp --token-file host-token.txt \
-  --command first-input --output json
+git clone https://github.com/microsoft/amplifier-ahp-client-kit.git
+cd amplifier-ahp-client-kit
+npm ci
+node src/cli.js --help
 ```
 
-`--agent` selects a host-advertised ACP agent for a new session. A resumed
-session keeps its original agent, workspace and configuration. Hosts advertising
-`managedCreation` v1 also support new managed chats with configured bundle aliases
-and typed provider-instance/model selections:
+Put your request in `request.txt`, then submit it to your host. The workspace path
+is on the host, and the token file must remain private:
 
 ```sh
-amplifier-ahp run --server wss://your-host/ahp --token-file host-token.txt \
-  --managed --agent amplifier --bundle work --provider work-openai \
-  --model YOUR_MODEL --effort low --prompt-file request.txt --command managed-input
+node src/cli.js run --server wss://your-host/ahp \
+  --token-file host-token.txt --workspace /host/work/project \
+  --prompt-file request.txt --command first-input
 ```
 
-`--managed` cannot be combined with `--session` or `--workspace`. The optional
-`--bundle` is an exact advertised alias, not a file or source URL; its revision
-is read and bound before creation. `--provider` names the configured provider
-**instance**, separate from the ACP `--agent`, and requires `--model` (and vice
-versa). `--effort` requires that pair. These options never reconfigure a resumed
-session. Omitted selections retain native defaults; unavailable negotiation,
-bundle or provider instance refuses before creation without a fallback. A model
-name is passed exactly; a successful creation does not establish model/account
-availability until the explicitly requested input executes.
+Inspect the same command if the connection or wait ends before its result arrives:
 
-Managed creation has a separately saved original creation command, target session
-and frozen request. A lost creation acknowledgement is recovered with the host's
-exact passive receipt. Even after creation is confirmed, that recovery never sends
-an input. If the original local attempt conclusively stopped before delivery,
-the result says `not-sent`; explicitly use the returned `--session` with a new
-input command. A still-running or interrupted local admission stays unconfirmed. Unknown receipts stay unknown; current settings are never used as
-proof of an earlier command.
-The host URI, session ID, command ID and original prompt are saved privately before
-session creation or prompt delivery. State is scoped by host and credential
-identity; supply a stable `--identity` when rotating a token. Keep these local
-records to inspect an interrupted command. Reusing an ID only observes its original
-input; changing its payload is rejected. A crashed command lock is never stolen.
-Lost create acknowledgements are also never retried. Hosts without receipt
-extensions still support standard current-page recovery; older absent output stays
-unconfirmed instead of triggering an unbounded history scan or another prompt.
-
-Text and JSON emit the final result. `--output jsonl --trace` explicitly includes
-selected-session actions, which can contain private prompt/tool content. Trace
-output and recovery queues are bounded; a slow consumer disconnects without
-cancelling or replaying host work. `--wait-ms` bounds observation (a handshake or
-in-flight request may finish later). Exit codes are 0 completed, 1 rejected or
-failed, 2 invalid invocation, 3 running or unconfirmed, and 4 interactive input
-needed. The CLI never grants approvals automatically and never cancels merely
-because a wait, connection, or process ends.
-
-`AHP_HEADLESS_HOST_MODULE=/absolute/installed-host/dist/index.js npm test` adds
-public installed-host tests for real CLI invocation, bearer authentication,
-multiple inputs, approval handoff, lost acknowledgement and no replay. Those
-fixtures use a provider-free ACP peer; they do not establish real-model acceptance.
-Filesystem durability is currently qualified on POSIX systems.
-
-## Journal integration boundary
-
-Send the captured `begin(...).intent.action` to the captured `intent.channel` only after a newly created admission completes. Editing a newer private draft must not change the admitted input. Reusing an identity returns the original record without dispatch; callers remain responsible for detecting conflicting reuse. Route echo and receipt updates through `settle` on the same adapter object to preserve concurrent evidence. Distinct adapter instances, tabs and processes require storage-owned transactions or exclusive claims; this in-process queue does not provide cross-process admission. A failed write rejects without dispatch or automatic retry. No subscription, cache policy or UI state is added by the journal.
-
-Managed flags qualification uses `AHP_HEADLESS_HOST_MODULE` and
-`AHP_HEADLESS_NATIVE_PYTHON` with `test/managed-native.test.mjs`. The fixture owns
-all home/settings/state paths, supplies an offline public Core provider, guards
-real shared settings/keys against changes, and verifies bundle/instance/model/effort
-on an explicit input and cold continuation. It does not establish real account,
-remote model, current deployment or physical terminal acceptance. Failures retain
-the owned fixture; `AHP_HEADLESS_KEEP_FIXTURE=1` also retains success evidence.
-
-## Late action acknowledgement
-
-`IntentJournal.bindDispatch(id, {clientId, clientSeq})` binds an already admitted
-original intent to its wire identity and saves a bounded private lookup before
-sending. Both `begin(...).created` and `bindDispatch(...).created` must be true to
-permit that first dispatch. Binding reuse never permits another send. The
-journal retains a per-client sequence high-water mark, including after accepted
-lookups retire; full reloads may rotate the client ID. It preserves at most 128
-unresolved bindings and 4096 client IDs by default. Storage capacity rejects new
-binding without discarding unresolved work. The optional constructor argument
-`{scope, limit, maxBytes}` changes the correlation namespace and bounds; storage
-must still be partitioned by authenticated host/account/tab, with exclusive
-admission across distinct adapters or processes.
-
-```js
-const journal = new IntentJournal(privateScopedStorage);
-const admitted = await journal.begin(commandId, {channel, action});
-if (admitted.created) {
-  const bound = await journal.bindDispatch(commandId, {clientId, clientSeq});
-  if (bound.created) client.dispatch(bound.correlation.channel, bound.correlation.action, clientSeq);
-}
-// The caller supplies only envelopes from its authenticated host transport.
-const settled = await journal.acceptEcho(envelope);
-// null means no original semantic confirmation; never dispatch again here.
+```sh
+node src/cli.js inspect --server wss://your-host/ahp \
+  --token-file host-token.txt --command first-input --output json
 ```
 
-`acceptEcho` matches the retained original `origin.clientId/clientSeq`, channel,
-and JSON-semantic action. It returns `null` for absent or mismatched correlation;
-a semantically matching accepted/rejected echo durably settles only its original intent and
-returns `{id, status, intent, correlation}`. The receipt retains the original submitted action, origin, server sequence,
-verdict and original binding. Server-added metadata remains in canonical AHP
-resource state; it does not replace the saved intent or create another journal. A failed settlement write leaves the lookup for
-later original evidence, without replay. If only lookup retirement fails, the
-confirmed verdict is returned with `retirementError`; it remains confirmed and
-an exact duplicate echo can finish cleanup. An incompatible later verdict cannot
-replace confirmed evidence. Ordinary `settle` also preserves dispatch/echo
-identity and cannot downgrade a confirmed echo outcome.
+Reusing a command ID observes the original request; it does not send it again.
+Ending the client does not cancel host work. Interactive approvals must be handled
+in an interactive client. Prompts use the host's real configured provider and model.
 
-Timeout and disconnect may discard UI promise waiters, never durable bindings.
-Call `acceptEcho` before resource reducer duplicate/baseline checks. For reconnect,
-`recoverConnection(..., {onAction: async envelope => ...})` awaits that callback
-for every replayed envelope before reducing it, including duplicate resource
-sequences. The Web consumer owns waiter completion and UI invalidation. Fresh
-snapshots, equal current values and missing original echoes never settle intent.
-A full reload with a new client ID can observe an older intent only if the
-protocol actually supplies its original authenticated origin envelope. Legacy
-unknown intents without a dispatch binding remain unknown; no scan, guessed
-binding, migration, implicit repair or resend is performed.
+## Use the library
 
-### Extensible metadata and original intent confirmation
+Install a local checkout into your client project with
+`npm install /absolute/path/to/amplifier-ahp-client-kit`. The package exports:
 
-A correlated AHP server action may add plain-object `_meta` fields, including
-nested metadata members. Durable confirmation still requires the original
-client/sequence, channel, isolated storage binding, action type and semantic
-payload. Every caller-provided metadata field and value must remain present
-and unchanged; arrays remain exact. Extra non-metadata fields, changed text,
-IDs, kinds, scope or captured turn bindings do not confirm the intent.
+| Entry point | Use |
+| --- | --- |
+| `@amplifier/ahp-client-kit` | AHP connections, recovery, confirmed resources and durable intent records |
+| `@amplifier/ahp-client-kit/indexeddb` | Browser storage scoped to host, account and tab |
+| `@amplifier/ahp-client-kit/headless` | Programmatic noninteractive requests and inspection |
+| `@amplifier/ahp-client-kit/file-storage` | File-backed private request storage |
 
-This is a narrow additive-metadata rule, not universal acceptance of server
-normalization. Official SDK acknowledgement/reduction and the private journal's
-semantic confirmation remain separate. A mismatched result stays unknown and is
-never replayed. Derived metadata for queued and steering messages uses the same
-rule; there is no action-specific receipt store.
+Start with the [public TypeScript interfaces](src/index.d.ts) or
+[headless interfaces](src/headless.d.ts). Applications own rendering, reconnect
+timing, storage limits and authorization. Buffer events during recovery before
+applying them to confirmed state, and preserve uncertain requests without replay.
+
+The [client contract](contracts/client-kit.v1.md) describes integration obligations;
+[AHP](https://microsoft.github.io/agent-host-protocol/) defines the wire protocol.
+File-storage durability is currently qualified on POSIX systems.
+
+## Contributing
+
+Most contributions require you to agree to a
+Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
+the rights to use your contribution. For details, visit [Contributor License Agreements](https://cla.opensource.microsoft.com).
+
+When you submit a pull request, a CLA bot will automatically determine whether you need to provide
+a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
+provided by the bot. You will only need to do this once across all repos using our CLA.
+
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
+contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+## Trademarks
+
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
+trademarks or logos is subject to and must follow
+[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/legal/intellectualproperty/trademarks/usage/general).
+Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
+Any use of third-party trademarks or logos are subject to those third-party's policies.
