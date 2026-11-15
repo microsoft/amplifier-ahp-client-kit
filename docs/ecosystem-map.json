@@ -1,0 +1,107 @@
+{
+  "citations": [
+    {
+      "git_blob": "903e6b9fc9d52bbf075a504c14153ff4b0941d7b",
+      "path": "README.md",
+      "ref": "e63797f2cee6c3a9381bd11ff1ae668b453dd13a",
+      "sha256": "dfc22ef406c61150d9ea3934ab66a2e4fbb8a39fbdb7fc7204830d246fcf4727",
+      "url": "https://github.com/microsoft/amplifier-ahp-client-kit/blob/e63797f2cee6c3a9381bd11ff1ae668b453dd13a/README.md"
+    },
+    {
+      "git_blob": "b51a2ffa15ef33aa1e9c6ebb63001d3d3bae93d6",
+      "path": "contracts/client-kit.v1.md",
+      "ref": "e63797f2cee6c3a9381bd11ff1ae668b453dd13a",
+      "sha256": "49b29139539f49f417a8c135b7c4a0ecbd24caa18e393ec2ba01868dd25a9fcf",
+      "url": "https://github.com/microsoft/amplifier-ahp-client-kit/blob/e63797f2cee6c3a9381bd11ff1ae668b453dd13a/contracts/client-kit.v1.md"
+    }
+  ],
+  "consumer_cta": {
+    "basis": "Existing approved README route; target release assets/availability not freshly audited in this plan.",
+    "label": "Try the command-line client",
+    "url": "https://github.com/microsoft/amplifier-ahp-client-kit#get-started-with-the-command-line-client"
+  },
+  "display_name": "Amplifier AHP Client Kit",
+  "edges": [
+    {
+      "from": "self",
+      "relation": "contains",
+      "to": "connection"
+    },
+    {
+      "from": "self",
+      "relation": "contains",
+      "to": "storage"
+    },
+    {
+      "from": "self",
+      "relation": "contains",
+      "to": "cli"
+    },
+    {
+      "from": "self",
+      "relation": "uses",
+      "to": "host"
+    },
+    {
+      "from": "web",
+      "relation": "uses",
+      "to": "self"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "self",
+      "kind": "self",
+      "label": "Amplifier AHP Client Kit",
+      "repository": "microsoft/amplifier-ahp-client-kit"
+    },
+    {
+      "id": "connection",
+      "kind": "internal",
+      "label": "Connection & confirmed-state recovery"
+    },
+    {
+      "id": "storage",
+      "kind": "internal",
+      "label": "Browser / file storage adapters"
+    },
+    {
+      "id": "cli",
+      "kind": "internal",
+      "label": "Headless CLI"
+    },
+    {
+      "id": "host",
+      "kind": "external",
+      "label": "Compatible AHP host",
+      "repository": "microsoft/amplifier-unified-host"
+    },
+    {
+      "id": "web",
+      "kind": "external",
+      "label": "AHP Web Client",
+      "repository": "microsoft/amplifier-unified-client-web"
+    }
+  ],
+  "notes": [
+    "AHP network transport does not itself claim the whole Constellation participation/Connection contract.",
+    "Client applications own rendering, reconnect timing, storage limits and authorization.",
+    "No agent runtime loads in the client kit."
+  ],
+  "purpose": "Connect clients to an AHP host with recoverable requests, confirmed state and private drafts.",
+  "ref": "e63797f2cee6c3a9381bd11ff1ae668b453dd13a",
+  "repository": "microsoft/amplifier-ahp-client-kit",
+  "roles": [],
+  "scope": "shared client library",
+  "start_cta": {
+    "basis": "Existing approved README route; target release assets/availability not freshly audited in this plan.",
+    "label": "Try the command-line client",
+    "url": "https://github.com/microsoft/amplifier-ahp-client-kit#get-started-with-the-command-line-client"
+  },
+  "summary": "A reusable AHP client library and headless CLI, used by independently owned experiences.",
+  "supports_roles": [
+    "Experience",
+    "Connection"
+  ],
+  "visibility": "private"
+}
