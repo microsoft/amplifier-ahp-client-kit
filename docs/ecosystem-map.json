@@ -1,18 +1,18 @@
 {
   "citations": [
     {
-      "git_blob": "903e6b9fc9d52bbf075a504c14153ff4b0941d7b",
+      "git_blob": "a28665f48d1985a3a914906d57690e99b3350737",
       "path": "README.md",
-      "ref": "e63797f2cee6c3a9381bd11ff1ae668b453dd13a",
-      "sha256": "dfc22ef406c61150d9ea3934ab66a2e4fbb8a39fbdb7fc7204830d246fcf4727",
-      "url": "https://github.com/microsoft/amplifier-ahp-client-kit/blob/e63797f2cee6c3a9381bd11ff1ae668b453dd13a/README.md"
+      "ref": "855ab46ec60168219f9aaaa7801f978fc0743e9a",
+      "sha256": "c1f17ecbf320042b170cd93fc1345fb9d9bbcd236ea60b8850d288db14eeff59",
+      "url": "https://github.com/microsoft/amplifier-ahp-client-kit/blob/855ab46ec60168219f9aaaa7801f978fc0743e9a/README.md"
     },
     {
       "git_blob": "b51a2ffa15ef33aa1e9c6ebb63001d3d3bae93d6",
       "path": "contracts/client-kit.v1.md",
-      "ref": "e63797f2cee6c3a9381bd11ff1ae668b453dd13a",
+      "ref": "855ab46ec60168219f9aaaa7801f978fc0743e9a",
       "sha256": "49b29139539f49f417a8c135b7c4a0ecbd24caa18e393ec2ba01868dd25a9fcf",
-      "url": "https://github.com/microsoft/amplifier-ahp-client-kit/blob/e63797f2cee6c3a9381bd11ff1ae668b453dd13a/contracts/client-kit.v1.md"
+      "url": "https://github.com/microsoft/amplifier-ahp-client-kit/blob/855ab46ec60168219f9aaaa7801f978fc0743e9a/contracts/client-kit.v1.md"
     }
   ],
   "consumer_cta": {
@@ -80,6 +80,7 @@
       "id": "web",
       "kind": "external",
       "label": "AHP Web Client",
+      "link": false,
       "repository": "microsoft/amplifier-unified-client-web"
     }
   ],
@@ -89,7 +90,7 @@
     "No agent runtime loads in the client kit."
   ],
   "purpose": "Connect clients to an AHP host with recoverable requests, confirmed state and private drafts.",
-  "ref": "e63797f2cee6c3a9381bd11ff1ae668b453dd13a",
+  "ref": "855ab46ec60168219f9aaaa7801f978fc0743e9a",
   "repository": "microsoft/amplifier-ahp-client-kit",
   "roles": [],
   "scope": "shared client library",
@@ -103,5 +104,5 @@
     "Experience",
     "Connection"
   ],
-  "visibility": "private"
+  "visibility": "public"
 }
